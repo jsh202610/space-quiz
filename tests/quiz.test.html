@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<title>Quiz browser tests</title>
+<h1>Quiz browser tests</h1>
+<p>Serve the repository with <code>python -m http.server</code> and open
+<code>/tests/quiz.test.html</code>. No dependencies are required.</p>
+<pre id="output">Running...</pre>
+<iframe title="Quiz under test" style="width:520px;height:700px"></iframe>
+<script>
+(async () => {
+  const output = document.getElementById("output");
+  let assertions = 0;
+  function assert(condition, message) {
+    assertions++;
+    if (!condition) throw new Error(message);
+  }
+  const equal = (actual, expected, message) =>
+    assert(JSON.stringify(actual) === JSON.stringify(expected), message);
+  try {
+    const response = await fetch("../index.html");
+    if (!response.ok) throw new Error(`Unable to load quiz: ${response.status}`);
+    const html = await response.text();
+    const frame = document.querySelector("iframe");
+    const loaded = new Promise(resolve => frame.onload = resolve);
+    // Control randomness before the app's first run, without changing production code.
+    frame.srcdoc = html.replace("<script>", `<script>
+      window.randomValue = 0;
+      window.randomCalls = 0;
+      Math.random = () => { window.randomCalls++; return window.randomValue; };
+    `);
+    await loaded;
+    const win = frame.contentWindow;
+    const doc = win.document;
+    const get = id => doc.getElementById(id);
+    const read = expression => win.eval(expression);
+    const bank = read("JSON.parse(JSON.stringify(Q))");
+    assert(bank.length === 10, "The original ten questions remain available");
+    read("Q.forEach(q => { Object.freeze(q[1]); Object.freeze(q); }); Object.freeze(Q)");
+    const originalOrder = bank.map(q => q[0]);
+    const sequence = () => read("questions.map(q => q[0])");
+    const key = value => doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: value, bubbles: true }));
+    let previousOrder;
+    const runs = [
+      { random: 0, expected: [...originalOrder.slice(1), originalOrder[0]], correct: true },
+      { random: 0.999999, expected: originalOrder, correct: false },
+      { random: 0.5, correct: true },
+      { random: 0.5, correct: false }
+    ];
+    for (const [run, config] of runs.entries()) {
+      if (run > 0) {
+        win.randomValue = config.random;
+        get("again").click();
+      }
+      const order = sequence();
+      const calls = win.randomCalls;
+      equal(calls, (run + 1) * 9, "Shuffle runs exactly once on load or replay");
+      equal([...order].sort(), [...originalOrder].sort(), "Every question appears exactly once");
+      if (config.expected) equal(order, config.expected, "Fisher-Yates handles random boundary values");
+      if (run === 3) equal(order, previousOrder, "An identical replay sequence is allowed");
+      assert(read("questions !== Q"), "Each run uses a copy of the bank");
+      assert(!get("quiz").hidden && get("result").hidden, "Quiz is visible after reset");
+      equal(get("score").textContent, "0", "Score resets");
+      equal(parseFloat(get("fill").style.width), 0, "Progress resets");
+      equal(get("bar").getAttribute("aria-valuenow"), "0", "Accessible progress resets");
+      let expectedScore = 0;
+      const seen = [];
+      for (let index = 0; index < bank.length; index++) {
+        const question = bank.find(q => q[0] === get("q").textContent);
+        assert(Boolean(question), "Displayed question belongs to the original bank");
+        seen.push(question[0]);
+        equal(question[0], order[index], "Display follows the run sequence");
+        equal(get("count").textContent, `Question ${index + 1} of 10`, "Counter follows run position");
+        equal(get("next").textContent, index === 9 ? "See results" : "Next", "Last-question label is correct");
+        assert(get("next").hidden, "Next stays hidden until answered");
+        read("render()");
+        equal(sequence(), order, "Rendering does not reshuffle");
+        equal([...doc.querySelectorAll(".label")].map(el => el.textContent), question[1], "Option order is unchanged");
+        const buttons = [...get("opts").children];
+        assert(buttons.every(button => !button.disabled), "New question is unlocked");
+        const correct = config.correct || index % 2 === 0;
+        const choice = correct ? question[2] : (question[2] + 1) % 4;
+        if (index % 3 === 0) buttons[choice].click();
+        else if (index % 3 === 1) key(String(choice + 1));
+        else key((index % 2 ? "ABCD" : "abcd")[choice]);
+        if (correct) expectedScore++;
+        equal(get("score").textContent, String(expectedScore), "Mouse and keyboard score the displayed answer");
+        assert(buttons[question[2]].classList.contains("correct"), "Original correct-answer mapping is preserved");
+        if (!correct) {
+          assert(buttons[choice].classList.contains("wrong"), "Wrong selection is marked");
+          assert(get("fb").textContent.includes(question[1][question[2]]), "Feedback names the displayed correct answer");
+        }
+        assert(buttons.every(button => button.disabled), "Answers lock after selection");
+        key(String(question[2] + 1));
+        equal(get("score").textContent, String(expectedScore), "Repeated input cannot score twice");
+        equal(get("fill").style.width, `${(index + 1) * 10}%`, "Progress tracks answered questions");
+        equal(get("bar").getAttribute("aria-valuenow"), String(index + 1), "Accessible progress tracks answers");
+        assert(!get("next").hidden, "Next appears after answering");
+        equal(sequence(), order, "Answering does not reshuffle");
+        equal(win.randomCalls, calls, "Progressing through a run consumes no randomness");
+        get("next").click();
+      }
+      equal(seen, order, "The full run displays all questions in sequence");
+      assert(get("quiz").hidden && !get("result").hidden, "Results appear after ten questions");
+      equal(get("final").textContent, `${expectedScore} / 10`, "Final score reflects the run");
+      equal(read("JSON.parse(JSON.stringify(Q))"), bank, "Canonical bank and options remain unchanged");
+      previousOrder = order;
+    }
+    output.textContent = `PASS: ${assertions} assertions across initial load and three replays.`;
+    document.title = "PASS - Quiz browser tests";
+  } catch (error) {
+    output.textContent = `FAIL after ${assertions} assertions: ${error.stack}`;
+    document.title = "FAIL - Quiz browser tests";
+    console.error(error);
+  }
+})();
+</script>
+</html>
