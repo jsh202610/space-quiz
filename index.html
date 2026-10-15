@@ -69,6 +69,7 @@
   .opt.dim { opacity: .55; }
   .fb { min-height: 22px; margin: 14px 0 0; font-weight: 600; font-size: 14px; }
   .fb.good { color: var(--good); } .fb.bad { color: var(--bad); }
+  .explanation { margin: 8px 0 0; color: var(--text); }
   .next {
     margin-top: 12px; width: 100%; font: inherit; font-weight: 600; color: #fff; border: 0; cursor: pointer;
     padding: 12px; border-radius: 12px; background: linear-gradient(90deg, var(--accent), var(--accent-2));
@@ -102,7 +103,10 @@
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" id="bar"><div class="fill" id="fill"></div></div>
       <h2 class="q" id="q"></h2>
       <div class="opts" id="opts"></div>
-      <p class="fb" id="fb" aria-live="polite"></p>
+      <div aria-live="polite" aria-atomic="true">
+        <p class="fb" id="fb"></p>
+        <p class="explanation" id="explanation" hidden></p>
+      </div>
       <button class="next" id="next" hidden>Next</button>
     </div>
     <div class="result" id="result" hidden>
@@ -116,16 +120,26 @@
 </main>
 <script>
 const Q = [
-  ["Which planet is known as the Red Planet?", ["Venus", "Mars", "Jupiter", "Mercury"], 1],
-  ["Who was the first human in space?", ["Neil Armstrong", "Buzz Aldrin", "Yuri Gagarin", "John Glenn"], 2],
-  ["In what year did Apollo 11 land on the Moon?", ["1965", "1969", "1972", "1975"], 1],
-  ["Which space telescope launched in 1990?", ["Hubble", "Kepler", "James Webb", "Spitzer"], 0],
-  ["What is the largest planet in our solar system?", ["Saturn", "Neptune", "Jupiter", "Uranus"], 2],
-  ["What was the first artificial satellite?", ["Explorer 1", "Sputnik 1", "Vostok 1", "Telstar"], 1],
-  ["Which probe left the heliosphere and entered interstellar space in 2012?", ["Voyager 1", "Pioneer 10", "New Horizons", "Cassini"], 0],
-  ["Which dwarf planet did New Horizons fly by in 2015?", ["Ceres", "Eris", "Pluto", "Haumea"], 2],
-  ["Which moon of Saturn has a thick nitrogen atmosphere?", ["Europa", "Titan", "Enceladus", "Io"], 1],
-  ["What is the name of NASA's rover that landed on Mars in 2021?", ["Curiosity", "Opportunity", "Spirit", "Perseverance"], 3]
+  ["Which planet is known as the Red Planet?", ["Venus", "Mars", "Jupiter", "Mercury"], 1,
+    "Iron minerals in Mars's surface material oxidize, or rust, giving the planet its reddish appearance."],
+  ["Who was the first human in space?", ["Neil Armstrong", "Buzz Aldrin", "Yuri Gagarin", "John Glenn"], 2,
+    "Yuri Gagarin completed one orbit of Earth aboard Vostok 1 on April 12, 1961. His flight lasted about 108 minutes."],
+  ["In what year did Apollo 11 land on the Moon?", ["1965", "1969", "1972", "1975"], 1,
+    "Neil Armstrong and Buzz Aldrin landed in the Sea of Tranquility, while Michael Collins remained in orbit around the Moon."],
+  ["Which space telescope launched in 1990?", ["Hubble", "Kepler", "James Webb", "Spitzer"], 0,
+    "Hubble orbits above the atmosphere that blurs our view from the ground, allowing it to capture sharp images of distant stars and galaxies."],
+  ["What is the largest planet in our solar system?", ["Saturn", "Neptune", "Jupiter", "Uranus"], 2,
+    "Jupiter is about 11 times wider than Earth. This gas giant is made mostly of hydrogen and helium."],
+  ["What was the first artificial satellite?", ["Explorer 1", "Sputnik 1", "Vostok 1", "Telstar"], 1,
+    "Launched in 1957, Sputnik 1 sent out radio beeps that could be picked up on Earth, marking the start of the space age."],
+  ["Which probe left the heliosphere and entered interstellar space in 2012?", ["Voyager 1", "Pioneer 10", "New Horizons", "Cassini"], 0,
+    "Voyager 1 crossed the heliopause, the boundary of the bubble created by the Sun's solar wind. This is not the edge of the entire solar system, which extends much farther."],
+  ["Which dwarf planet did New Horizons fly by in 2015?", ["Ceres", "Eris", "Pluto", "Haumea"], 2,
+    "New Horizons revealed a varied landscape on Pluto, including mountains of water ice and a vast plain of nitrogen ice."],
+  ["Which moon of Saturn has a thick nitrogen atmosphere?", ["Europa", "Titan", "Enceladus", "Io"], 1,
+    "Beneath its hazy atmosphere, Titan has lakes and seas of liquid methane and ethane rather than liquid water."],
+  ["What is the name of NASA's rover that landed on Mars in 2021?", ["Curiosity", "Opportunity", "Spirit", "Perseverance"], 3,
+    "Perseverance explores Jezero Crater, which once held a lake, to search for signs of past microbial life. It also collects rock and soil samples for possible future study on Earth."]
 ];
 const $ = id => document.getElementById(id);
 let i = 0, score = 0, locked = false;
@@ -136,6 +150,7 @@ function render() {
   $("count").textContent = `Question ${i + 1} of ${Q.length}`;
   $("q").textContent = q;
   $("fb").textContent = ""; $("fb").className = "fb";
+  $("explanation").textContent = ""; $("explanation").hidden = true;
   $("next").hidden = true;
   $("next").textContent = i === Q.length - 1 ? "See results" : "Next";
   $("opts").replaceChildren(...opts.map((t, k) => {
@@ -163,6 +178,7 @@ function answer(k) {
   else { btns[k].classList.add("wrong"); btns[k].querySelector(".status").textContent = "✖ Wrong"; }
   $("fb").textContent = ok ? "✅ Correct! Nice work, astronaut." : `❌ Not quite — the answer is ${Q[i][1][right]}.`;
   $("fb").className = "fb " + (ok ? "good" : "bad");
+  $("explanation").textContent = Q[i][3]; $("explanation").hidden = false;
   $("card").classList.remove("flash-good", "flash-bad");
   void $("card").offsetWidth;
   $("card").classList.add(ok ? "flash-good" : "flash-bad");
