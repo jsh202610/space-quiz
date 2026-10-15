@@ -143,16 +143,28 @@ const Q = [
 ];
 const $ = id => document.getElementById(id);
 let i = 0, score = 0, locked = false;
+let questions = [];
+
+function start() {
+  questions = Q.slice();
+  for (let n = questions.length - 1; n > 0; n--) {
+    const k = Math.floor(Math.random() * (n + 1));
+    [questions[n], questions[k]] = [questions[k], questions[n]];
+  }
+  i = 0; score = 0; $("score").textContent = 0; $("fill").style.width = "0";
+  $("bar").setAttribute("aria-valuenow", 0);
+  $("result").hidden = true; $("quiz").hidden = false; render();
+}
 
 function render() {
-  const [q, opts] = Q[i];
+  const [q, opts] = questions[i];
   locked = false;
-  $("count").textContent = `Question ${i + 1} of ${Q.length}`;
+  $("count").textContent = `Question ${i + 1} of ${questions.length}`;
   $("q").textContent = q;
   $("fb").textContent = ""; $("fb").className = "fb";
   $("explanation").textContent = ""; $("explanation").hidden = true;
   $("next").hidden = true;
-  $("next").textContent = i === Q.length - 1 ? "See results" : "Next";
+  $("next").textContent = i === questions.length - 1 ? "See results" : "Next";
   $("opts").replaceChildren(...opts.map((t, k) => {
     const b = document.createElement("button");
     b.className = "opt";
@@ -169,26 +181,26 @@ function render() {
 function answer(k) {
   if (locked) return;
   locked = true;
-  const right = Q[i][2], btns = [...$("opts").children];
+  const right = questions[i][2], btns = [...$("opts").children];
   btns.forEach((b, n) => { b.disabled = true; if (n !== right && n !== k) b.classList.add("dim"); });
   btns[right].classList.add("correct");
   btns[right].querySelector(".status").textContent = "✔ Correct";
   const ok = k === right;
   if (ok) { score++; $("score").textContent = score; }
   else { btns[k].classList.add("wrong"); btns[k].querySelector(".status").textContent = "✖ Wrong"; }
-  $("fb").textContent = ok ? "✅ Correct! Nice work, astronaut." : `❌ Not quite — the answer is ${Q[i][1][right]}.`;
+  $("fb").textContent = ok ? "✅ Correct! Nice work, astronaut." : `❌ Not quite — the answer is ${questions[i][1][right]}.`;
   $("fb").className = "fb " + (ok ? "good" : "bad");
   $("explanation").textContent = Q[i][3]; $("explanation").hidden = false;
   $("card").classList.remove("flash-good", "flash-bad");
   void $("card").offsetWidth;
   $("card").classList.add(ok ? "flash-good" : "flash-bad");
-  $("fill").style.width = ((i + 1) / Q.length * 100) + "%";
+  $("fill").style.width = ((i + 1) / questions.length * 100) + "%";
   $("bar").setAttribute("aria-valuenow", i + 1);
   $("next").hidden = false; $("next").focus();
 }
 
 function finish() {
-  const p = score / Q.length;
+  const p = score / questions.length;
   const [e, t, m] = p === 1 ? ["🏆", "Mission Commander!", "A perfect score. You're ready for launch."]
     : p >= .8 ? ["🚀", "Rocket Scientist!", "Outstanding knowledge of the cosmos."]
     : p >= .6 ? ["🌟", "Space Cadet", "Solid effort — keep exploring."]
@@ -196,7 +208,7 @@ function finish() {
     : ["🌍", "Still on the Launchpad", "Every astronaut starts somewhere!"];
   $("quiz").hidden = true; $("result").hidden = false;
   $("emoji").textContent = e; $("title").textContent = t; $("msg").textContent = m;
-  $("final").textContent = `${score} / ${Q.length}`;
+  $("final").textContent = `${score} / ${questions.length}`;
   $("again").focus();
 }
 
@@ -205,13 +217,9 @@ document.addEventListener("keydown", e => {
   const n = "1234".indexOf(e.key) >= 0 ? +e.key - 1 : "abcd".indexOf(e.key.toLowerCase());
   if (n >= 0 && n < 4 && !$("quiz").hidden) { const b = $("opts").children[n]; if (b && !b.disabled) b.click(); }
 });
-$("next").onclick = () => { if (++i < Q.length) render(); else finish(); };
-$("again").onclick = () => {
-  i = 0; score = 0; $("score").textContent = 0; $("fill").style.width = "0";
-  $("bar").setAttribute("aria-valuenow", 0);
-  $("result").hidden = true; $("quiz").hidden = false; render();
-};
-render();
+$("next").onclick = () => { if (++i < questions.length) render(); else finish(); };
+$("again").onclick = start;
+start();
 </script>
 </body>
 </html>
